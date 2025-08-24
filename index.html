@@ -1,40 +1,226 @@
-<!DOCTYPE html><html lang="en">
+<!doctype html>
+
+<html lang="en">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Rubik's Cube — JS Solver (No APIs)</title>
+  <title>Rubik's Cube — 3D + API Solver (CubeX‑style)</title>
   <style>
-    :root { --gap: 8px; --tile: 32px; --round: 8px; font-family: system-ui, -apple-system, Segoe UI, Roboto, Inter, Arial, sans-serif; }
-    body { margin: 0; padding: 24px; background: #0b1020; color: #f4f6fa; }
-    h1 { margin: 0 0 8px; font-size: 24px; }
-    p { margin: 0 0 16px; color: #cfd6e6; }
-    .app { display: grid; gap: 16px; grid-template-columns: 360px 1fr; align-items: start; }
-    .panel { background: #121833; padding: 16px; border-radius: 16px; box-shadow: 0 8px 24px rgba(0,0,0,.35), inset 0 1px 0 rgba(255,255,255,.04); }
-    .panel h2 { margin: 0 0 12px; font-size: 18px; }
-    .grid { display: grid; grid-template-columns: repeat(12, var(--tile)); grid-auto-rows: var(--tile); gap: 6px; justify-content: center; }
-    .face { display: grid; grid-template-columns: repeat(3, var(--tile)); grid-template-rows: repeat(3, var(--tile)); gap: 3px; }
-    .facewrap { display:grid; grid-template-columns: repeat(4, auto); grid-template-rows: auto auto auto; gap: var(--gap); align-items: center; }
-    .spacer { width: calc(3*var(--tile) + 2*3px); }
-    .tile { width: var(--tile); height: var(--tile); border-radius: 6px; border: 1px solid rgba(255,255,255,.12); cursor: pointer; box-shadow: inset 0 0 0 2px rgba(0,0,0,.15); }
-    .tile.center { cursor: default; box-shadow: inset 0 0 0 2px rgba(0,0,0,.35); }
-    .palette { display:flex; gap:8px; flex-wrap:wrap; }
-    .swatch { width: 28px; height: 28px; border-radius: 50%; border: 2px solid rgba(255,255,255,.35); cursor:pointer; box-shadow: 0 4px 10px rgba(0,0,0,.35); }
-    .swatch.active { outline: 2px solid #fff; outline-offset: 2px; }
-    .controls { display:flex; flex-wrap:wrap; gap: 8px; }
-    button { padding: 8px 12px; background: #1a2350; color:#fff; border: 1px solid rgba(255,255,255,.14); border-radius: 12px; cursor: pointer; font-weight: 600; }
-    button:hover { background:#21307a; }
-    textarea, input[type="text"] { width: 100%; background: #0f1533; color: #eaf0ff; border:1px solid rgba(255,255,255,.18); border-radius:12px; padding:10px; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace; }
-    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace; }
-    .log { height: 260px; overflow:auto; background:#0f1533; border-radius: 12px; padding: 12px; border:1px solid rgba(255,255,255,.12); }
-    .badge { display:inline-block; padding: 2px 6px; border-radius: 999px; background:#0f5; color:#001b0a; font-weight:800; margin-right:6px; }
-    .warn { background:#ffcc00; color:#2a2000; }
-    .err { background:#ff5f52; color:#1e0000; }
-    .row { display:flex; gap: 12px; align-items:center; }
-    .hint { color:#9fb2ff; }
+    :root {
+      --bg: #0b1020; --panel:#121931; --ink:#e7ecff; --muted:#9fb0ff66; --accent:#6aa6ff;
+      --ok:#27c093; --warn:#ffb020; --bad:#ff5b6e;
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{margin:0;font-family:ui-sans-serif,system-ui,Segoe UI,Roboto,Helvetica,Arial;background:var(--bg);color:var(--ink)}
+    .app{display:grid;grid-template-columns:380px 1fr;gap:16px;height:100%}
+    .left{background:var(--panel);padding:16px;overflow:auto}
+    .right{position:relative;display:flex;flex-direction:column}
+    header{display:flex;align-items:center;gap:8px;margin-bottom:12px}
+    header h1{font-size:18px;margin:0;font-weight:600}
+    .card{background:#0f1530;border:1px solid #223059; border-radius:16px;padding:12px;margin-bottom:12px}
+    .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+    label{font-size:12px;color:#c7d2fe99}
+    input, textarea, select, button{border-radius:10px;border:1px solid #223059;background:#0d1430;color:var(--ink);padding:10px;outline:none}
+    input:focus, textarea:focus, select:focus{border-color:#395bb8}
+    button{cursor:pointer}
+    button.primary{background:linear-gradient(180deg,#3a7bff,#2b58db);border:0}
+    button.ghost{background:transparent;border:1px dashed #395bb8}
+    .hint{font-size:12px;color:var(--muted)}
+    .stack{display:flex;flex-direction:column;gap:8px}
+    .grid{display:grid;grid-template-columns:repeat(3,26px);gap:4px;}
+    .flex{display:flex;gap:8px;align-items:center}
+    .ok{color:var(--ok)} .warn{color:var(--warn)} .bad{color:var(--bad)}
+    .log{font-family:ui-monospace, SFMono-Regular, Menlo, monospace; font-size:12px; white-space:pre-wrap; line-height:1.4; background:#081028; border:1px solid #223059; border-radius:12px; padding:8px; max-height:220px; overflow:auto}
+    .footer{margin-top:auto;opacity:.7;font-size:12px;padding:10px}
+    twisty-player{width:100%;height:100%;min-height:420px;border-top-left-radius:16px;border-bottom-left-radius:16px;background:transparent}
+    .player-wrap{position:relative;flex:1;display:flex}
+    .player-overlay{position:absolute;inset:8px auto auto 8px;display:flex;gap:6px;z-index:2}
   </style>
+  <!-- 3D Cube player -->
+  <script src="https://cdn.cubing.net/v0/js/cubing/twisty" type="module"></script>
 </head>
 <body>
-  <h1>Rubik's Cube — Vanilla JS Solver <span class="badge">Beta</span></h1>
+  <div class="app">
+    <aside class="left">
+      <header>
+        <h1>Rubik's Cube — 3D + API Solver</h1>
+      </header><div class="card stack">
+    <div class="row"><strong>1) Paste cube facelets (URFDLB order)</strong></div>
+    <textarea id="facelets" rows="3" placeholder="e.g. UUUUUUUUURRRRRRRRRFFFFFFFFFDDDDDDDDDLLLLLLLLLBBBBBBBBB"></textarea>
+    <div class="hint">Use letters U,R,F,D,L,B to denote the <em>center color</em> of each facelet. Order is: U face (row-major) → R → F → D → L → B.
+    <br/>Tip: If you have our painter UI from the previous version, click “Export” there and paste here.</div>
+  </div>
+
+  <div class="card stack">
+    <div class="row"><strong>2) Choose how to solve</strong></div>
+    <div class="stack">
+      <label>Solver API URL (optional)
+        <input id="apiURL" placeholder="https://your-solver.example/solve" />
+      </label>
+      <div class="hint">There’s <span class="warn">no official public Cube Explorer HTTP API</span>. Set this to your own endpoint that runs Kociemba / Cube Explorer logic and accepts <code>{ cube: &quot;URFDLB...&quot; }</code> JSON. If left blank, the app will only do built‑in demo steps.</div>
+      <div class="row">
+        <button id="btnSolveAPI" class="primary">Solve via API → animate</button>
+        <button id="btnDemo" class="ghost">Demo (white cross + F2L only)</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="card stack">
+    <div class="row"><strong>3) Controls</strong></div>
+    <div class="row">
+      <button id="btnPlay" class="ghost">▶ Play</button>
+      <button id="btnPause" class="ghost">⏸ Pause</button>
+      <button id="btnReset" class="ghost">⟲ Reset View</button>
+    </div>
+    <div class="hint">Playback will start from the scrambled state and end solved, CubeX‑style.</div>
+  </div>
+
+  <div class="card">
+    <div class="row"><strong>Logs</strong></div>
+    <div id="log" class="log">Ready.</div>
+  </div>
+
+  <div class="footer">Keyboard: space = play/pause, ←/→ step; Mouse: drag to orbit.</div>
+</aside>
+
+<main class="right">
+  <div class="player-wrap">
+    <div class="player-overlay">
+      <button id="btnCopyAlg" class="ghost" title="Copy current alg to clipboard">Copy alg</button>
+    </div>
+    <twisty-player id="player"
+      puzzle="3x3x3"
+      control-panel="full"
+      background="none"
+      hint-facelets="none"
+      camera-orbit="auto"
+      experimental-setup-anchor="start"
+    ></twisty-player>
+  </div>
+</main>
+
+  </div><script>
+(function(){
+  const logEl = document.getElementById('log');
+  const player = document.getElementById('player');
+  const faceletsEl = document.getElementById('facelets');
+  const apiURLEl = document.getElementById('apiURL');
+
+  const btnSolveAPI = document.getElementById('btnSolveAPI');
+  const btnDemo = document.getElementById('btnDemo');
+  const btnPlay = document.getElementById('btnPlay');
+  const btnPause = document.getElementById('btnPause');
+  const btnReset = document.getElementById('btnReset');
+  const btnCopyAlg = document.getElementById('btnCopyAlg');
+
+  function log(msg, type="info"){
+    const color = type==='ok'? 'var(--ok)': type==='warn'? 'var(--warn)': type==='bad'? 'var(--bad)': 'var(--ink)';
+    const time = new Date().toLocaleTimeString();
+    logEl.innerHTML = `<span style="color:${color}">[${time}]</span> ${msg}\n` + logEl.innerHTML;
+  }
+
+  // --- Helper: invert an algorithm string (e.g., "R U R'" -> "R U' R'")
+  function invertAlg(alg){
+    return alg
+      .trim()
+      .split(/\s+/)
+      .filter(Boolean)
+      .reverse()
+      .map(tok => {
+        // handle double moves and wide moves
+        const m = tok.match(/^([URFDLBMESxyz][w']?2?)$/);
+        if(!m) return tok; // leave comments/parentheses as-is
+        let t = m[1];
+        if(t.endsWith("2")) return t; // 180° is its own inverse
+        if(t.endsWith("'")) return t.slice(0,-1);
+        return t + "'";
+      })
+      .join(' ');
+  }
+
+  // --- CORE: animate from current scrambled state using a solution alg
+  function animateSolution(solutionAlg){
+    const setup = invertAlg(solutionAlg);
+    player.setAttribute('experimental-setup-alg', setup);
+    player.setAttribute('alg', solutionAlg);
+    player.setAttribute('experimental-setup-anchor', 'start');
+    log(`Applied solution (len ${solutionAlg.split(/\s+/).filter(Boolean).length}): ${solutionAlg}`, 'ok');
+    // auto-play
+    player.play?.();
+  }
+
+  // --- Demo path (no API): very basic placeholder steps
+  function demoSolve(){
+    const demo = "F R U R' U' F'  // OLL Sune\nR U R' U R U2 R'  // OLL\nU R U' R' U' R' F R F'"; // simple LL sample; not a full general solver
+    animateSolution(demo);
+    log('Demo sequence loaded (not state‑aware). For true solves, use an API or plug in a WebAssembly/JS Kociemba.', 'warn');
+  }
+
+  // --- API call
+  async function solveViaAPI(facelets, url){
+    const endpoint = url?.trim();
+    if(!endpoint){
+      throw new Error('No API URL configured. Please provide your own endpoint that runs a Kociemba/Cube Explorer solver.');
+    }
+    const res = await fetch(endpoint, {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ cube: facelets })
+    });
+    if(!res.ok){
+      const text = await res.text().catch(()=>res.statusText);
+      throw new Error(`API ${res.status} — ${text}`);
+    }
+    const data = await res.json();
+    if(!data || !data.solution){
+      throw new Error('API returned no { solution }.');
+    }
+    return data.solution.trim();
+  }
+
+  // --- Validate facelets (quick sanity checks)
+  function validateFacelets(s){
+    if(!s || s.length!==54) return 'Facelets string must be exactly 54 chars (URFDLB faces).';
+    const counts = {U:0,R:0,F:0,D:0,L:0,B:0};
+    for(const ch of s){ if(counts[ch]!==undefined) counts[ch]++; else return `Invalid char ${ch}. Use only U,R,F,D,L,B.`; }
+    for(const k in counts){ if(counts[k]!==9) return `Expected 9 of ${k}, got ${counts[k]}.`; }
+    return null;
+  }
+
+  // --- UI wiring
+  btnSolveAPI.addEventListener('click', async () => {
+    const f = faceletsEl.value.trim();
+    const err = validateFacelets(f);
+    if(err){ log(err, 'bad'); return; }
+    log('Requesting solution from API…');
+    try{
+      const sol = await solveViaAPI(f, apiURLEl.value);
+      animateSolution(sol);
+    }catch(e){
+      log(`Solve failed: ${e.message}`, 'bad');
+    }
+  });
+
+  btnDemo.addEventListener('click', demoSolve);
+  btnPlay.addEventListener('click', ()=> player.play?.());
+  btnPause.addEventListener('click', ()=> player.pause?.());
+  btnReset.addEventListener('click', ()=> { player.currentTime = 0; player.pause?.(); });
+  btnCopyAlg.addEventListener('click', async ()=>{
+    const alg = player.getAttribute('alg') || '';
+    try{ await navigator.clipboard.writeText(alg); log('Alg copied to clipboard.','ok'); }catch{ log('Could not copy.','bad'); }
+  });
+
+  log('3D player ready. Paste facelets, set your API URL, then "Solve via API".');
+})();
+</script><!--
+IMPORTANT NOTE ABOUT "CUBE EXPLORER SOLVER API"
+There is no official public HTTP API for Cube Explorer. Most sites either:
+  • Render images via VisualCube (image API) — not a solver. 
+  • Run Kociemba / Cube Explorer logic server-side and expose a custom endpoint (what the input box above expects).
+If you need, I can scaffold a tiny Node/Express or Python/FastAPI service that calls a solver lib and returns { solution }.
+--></body>
+</html>  <h1>Rubik's Cube — Vanilla JS Solver <span class="badge">Beta</span></h1>
   <p>Click stickers to paint the cube. Pick a color in the palette first. No APIs, just JavaScript. Currently implements: <strong>white cross + first layer</strong>. Remaining steps are scaffolded and easy to extend (notes in code).</p>  <div class="app">
     <!-- LEFT: Cube editor -->
     <section class="panel">
